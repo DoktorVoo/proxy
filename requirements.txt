@@ -1,0 +1,21 @@
+# MTG Proxy Generator – Abhängigkeiten
+# Installation: pip install -r requirements.txt
+
+# Web-Framework
+flask>=3.0.0
+
+# WSGI-Server (für Render.com / Production)
+gunicorn>=21.2.0
+
+# PDF-Generierung
+fpdf2>=2.7.0
+
+# Bildverarbeitung
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# HTTP-Requests (Scryfall API)
+requests>=2.31.0
+
+# Inpainting für Text-Entfernung (kein GUI nötig → headless)
+opencv-python-headless>=4.8.0
