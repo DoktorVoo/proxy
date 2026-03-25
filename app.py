@@ -2,7 +2,7 @@ import requests
 import time
 import os
 import json
-import io
+import ioa
 import uuid
 import threading
 import re
@@ -1408,6 +1408,22 @@ select{padding:5px 8px;background:#333;color:#eee;border:1px solid #555;border-r
           style="border:1px solid #444;border-radius:4px;background:#e8e2d0"></canvas>
 </div>
 
+<div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;font-size:.83em;color:#bbb;align-items:flex-start;padding:6px 0;border-top:1px solid #333">
+  <span style="color:#777;align-self:center;font-size:.8em">Rand-Blur (Feathering, px):</span>
+  <label style="display:flex;align-items:center;gap:6px">🔴 Name
+    <input type="range" id="blur_name" min="0" max="40" value="0" step="1" style="width:90px" oninput="updateBlur('name',this.value);document.getElementById('blurv_name').textContent=this.value">
+    <span id="blurv_name" style="width:24px;text-align:right;font-family:monospace">0</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px">🔵 Typzeile
+    <input type="range" id="blur_type_line" min="0" max="40" value="0" step="1" style="width:90px" oninput="updateBlur('type_line',this.value);document.getElementById('blurv_type_line').textContent=this.value">
+    <span id="blurv_type_line" style="width:24px;text-align:right;font-family:monospace">0</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px">🟢 Oracle-Box
+    <input type="range" id="blur_oracle_box" min="0" max="40" value="0" step="1" style="width:90px" oninput="updateBlur('oracle_box',this.value);document.getElementById('blurv_oracle_box').textContent=this.value">
+    <span id="blurv_oracle_box" style="width:24px;text-align:right;font-family:monospace">0</span>
+  </label>
+</div>
+
 <div id="wrap">
   <img id="cimg" src="" alt="">
   <canvas id="canvas-overlay"></canvas>
@@ -1428,6 +1444,7 @@ const SHAPE = {name:'rect',type_line:'rect',oracle_box:'rect',pt_box:'rect',wate
 let curZ = 'name', curShape = 'rect', zones = {}, drawing = false, sx = 0, sy = 0;
 let fontSizes = {name: 36, type: 26};
 let xOffsets  = {name: 16, type: 16};
+let blurValues = {name: 0, type_line: 0, oracle_box: 0};
 
 const prev = {{ saved | tojson }};
 if (prev) {
@@ -1442,6 +1459,14 @@ if (prev) {
     if (prev._x_offsets.name != null) document.getElementById('ox_name').value = prev._x_offsets.name;
     if (prev._x_offsets.type != null) document.getElementById('ox_type').value = prev._x_offsets.type;
   }
+  if (prev._blur_values) {
+    blurValues = Object.assign(blurValues, prev._blur_values);
+    ['name','type_line','oracle_box'].forEach(k => {
+      const el = document.getElementById('blur_'+k);
+      const vl = document.getElementById('blurv_'+k);
+      if (el && blurValues[k] != null) { el.value = blurValues[k]; vl.textContent = blurValues[k]; }
+    });
+  }
 }
 
 window.onload = () => {
@@ -1451,6 +1476,7 @@ window.onload = () => {
 };
 
 function updateFs(key, val) { fontSizes[key] = parseInt(val) || fontSizes[key]; }
+function updateBlur(key, val) { blurValues[key] = Math.max(0, parseInt(val) || 0); }
 function updateOx(key, val) { xOffsets[key]  = parseInt(val); }
 
 function renderPreview() {
@@ -1693,7 +1719,7 @@ async function save() {
     st.textContent = '⚠ Bitte noch setzen: ' + missing.join(', ');
     st.style.color = '#f88'; return;
   }
-  const payload = Object.assign({}, zones, {_font_sizes: fontSizes, _x_offsets: xOffsets});
+  const payload = Object.assign({}, zones, {_font_sizes: fontSizes, _x_offsets: xOffsets, _blur_values: blurValues});
   const r = await fetch('/calibrate/save', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload)
