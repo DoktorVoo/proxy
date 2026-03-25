@@ -1333,7 +1333,7 @@ h1{font-size:1.2em;color:#7cf}
 .zb[data-z="type_line"]     {border-color:#33e;color:#99f}
 .zb[data-z="oracle_box"]    {border-color:#3a3;color:#9f9}
 .zb[data-z="pt_box"]        {border-color:#e80;color:#fc8}
-.zb[data-z="watermark_bump"]{border-color:#b3f;color:#dbf}
+.zb[data-z="watermark_bump"]{border-color:#b3f;color:#dbf}.zb[data-z="name_erase"]{border-color:#f60;color:#faa}.zb[data-z="type_line_erase"]{border-color:#09d;color:#9df}
 #savebtn{padding:9px 26px;background:#2a7;border:none;border-radius:5px;color:#fff;font-size:.95em;cursor:pointer;font-weight:bold}
 #savebtn:hover{background:#3b8}
 #status{font-size:.88em;min-height:1.3em}
@@ -1344,7 +1344,8 @@ select{padding:5px 8px;background:#333;color:#eee;border:1px solid #555;border-r
 <h1>Zonen-Kalibrierung</h1>
 <div id="hint">Zone wählen → Bereich auf der Karte ziehen → Speichern.<br>
 <b>Rechteck-Zonen:</b> Name, Typzeile, Oracle-Box, P/T &nbsp;|&nbsp;
-<b>Ellipse:</b> Wassermarken-Ausbuchtung (nach innen, untere Mitte Oracle-Box)</div>
+<b>Ellipse:</b> Wassermarken-Ausbuchtung (nach innen, untere Mitte Oracle-Box)<br>
+<span style="color:#fc8">🔶 Name-Löschung / 🔹 Typ-Löschung: optionale separate Lösch-Zone – falls der Löschbereich größer oder verschoben sein soll als die Schreibzone.</span></div>
 
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
   <label style="font-size:.85em">Gespeicherte Karte:</label>
@@ -1369,6 +1370,9 @@ select{padding:5px 8px;background:#333;color:#eee;border:1px solid #555;border-r
   <button class="zb"    data-z="pt_box"     data-shape="rect" onclick="setZ(this)">🟠 P/T (opt.)</button>
   <div class="sep"></div>
   <button class="zb"    data-z="watermark_bump" data-shape="ellipse" onclick="setZ(this)">🟣 Wassermarke (Ellipse)</button>
+  <div class="sep"></div>
+  <button class="zb"    data-z="name_erase"      data-shape="rect" onclick="setZ(this)" title="Separate Lösch-Zone für den Kartenname (optional)">🔶 Name-Löschung</button>
+  <button class="zb"    data-z="type_line_erase" data-shape="rect" onclick="setZ(this)" title="Separate Lösch-Zone für die Typzeile (optional)">🔹 Typ-Löschung</button>
 </div>
 
 <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;font-size:.83em;color:#bbb;align-items:flex-start">
@@ -1422,6 +1426,14 @@ select{padding:5px 8px;background:#333;color:#eee;border:1px solid #555;border-r
     <input type="range" id="blur_oracle_box" min="0" max="40" value="0" step="1" style="width:90px" oninput="updateBlur('oracle_box',this.value);document.getElementById('blurv_oracle_box').textContent=this.value">
     <span id="blurv_oracle_box" style="width:24px;text-align:right;font-family:monospace">0</span>
   </label>
+  <label style="display:flex;align-items:center;gap:6px">🔶 Name-Löschung
+    <input type="range" id="blur_name_erase" min="0" max="40" value="0" step="1" style="width:90px" oninput="updateBlur('name_erase',this.value);document.getElementById('blurv_name_erase').textContent=this.value">
+    <span id="blurv_name_erase" style="width:24px;text-align:right;font-family:monospace">0</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px">🔹 Typ-Löschung
+    <input type="range" id="blur_type_line_erase" min="0" max="40" value="0" step="1" style="width:90px" oninput="updateBlur('type_line_erase',this.value);document.getElementById('blurv_type_line_erase').textContent=this.value">
+    <span id="blurv_type_line_erase" style="width:24px;text-align:right;font-family:monospace">0</span>
+  </label>
 </div>
 
 <div id="wrap">
@@ -1437,14 +1449,14 @@ select{padding:5px 8px;background:#333;color:#eee;border:1px solid #555;border-r
 <div id="status"></div>
 
 <script>
-const COLS  = {name:'#e33',type_line:'#33e',oracle_box:'#3a3',pt_box:'#e80',watermark_bump:'#b3f'};
-const LBLS  = {name:'Name',type_line:'Typzeile',oracle_box:'Oracle',pt_box:'P/T',watermark_bump:'Wassermarke'};
-const SHAPE = {name:'rect',type_line:'rect',oracle_box:'rect',pt_box:'rect',watermark_bump:'ellipse'};
+const COLS  = {name:'#e33',type_line:'#33e',oracle_box:'#3a3',pt_box:'#e80',watermark_bump:'#b3f',name_erase:'#f60',type_line_erase:'#09d'};
+const LBLS  = {name:'Name',type_line:'Typzeile',oracle_box:'Oracle',pt_box:'P/T',watermark_bump:'Wassermarke',name_erase:'Name-Löschung',type_line_erase:'Typ-Löschung'};
+const SHAPE = {name:'rect',type_line:'rect',oracle_box:'rect',pt_box:'rect',watermark_bump:'ellipse',name_erase:'rect',type_line_erase:'rect'};
 
 let curZ = 'name', curShape = 'rect', zones = {}, drawing = false, sx = 0, sy = 0;
 let fontSizes = {name: 36, type: 26};
 let xOffsets  = {name: 16, type: 16};
-let blurValues = {name: 0, type_line: 0, oracle_box: 0};
+let blurValues = {name: 0, type_line: 0, oracle_box: 0, name_erase: 0, type_line_erase: 0};
 
 const prev = {{ saved | tojson }};
 if (prev) {
@@ -1461,7 +1473,7 @@ if (prev) {
   }
   if (prev._blur_values) {
     blurValues = Object.assign(blurValues, prev._blur_values);
-    ['name','type_line','oracle_box'].forEach(k => {
+    ['name','type_line','oracle_box','name_erase','type_line_erase'].forEach(k => {
       const el = document.getElementById('blur_'+k);
       const vl = document.getElementById('blurv_'+k);
       if (el && blurValues[k] != null) { el.value = blurValues[k]; vl.textContent = blurValues[k]; }
