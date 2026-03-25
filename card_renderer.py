@@ -757,8 +757,14 @@ class CardRenderer:
 
         for key in ["name", "type_line"]:
             if key in zones:
-                img = self._erase_zone(img, *self._abs(img, zones[key]),
-                                       blur_radius=self._blur_values.get(key, 0))
+                # Separate Lösch-Zone nutzen, falls kalibriert (z.B. name_erase),
+                # sonst auf die Render-Zone zurückfallen
+                erase_key  = f"{key}_erase"
+                erase_zone = zones.get(erase_key, zones[key])
+                blur_key   = erase_key if erase_key in zones else key
+                img = self._erase_zone(img, *self._abs(img, erase_zone),
+                                       blur_radius=self._blur_values.get(
+                                           blur_key, self._blur_values.get(key, 0)))
 
         # Wassermarken-Bump aus Kalibrierung lesen
         bump_abs = None
