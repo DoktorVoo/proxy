@@ -173,6 +173,7 @@ class CardRenderer:
         self._calibrated_zones: dict | None = None
         self._font_size_overrides: dict = {}
         self._x_offsets: dict = {"name": 16, "type": 16}
+        self._blur_values: dict = {}  # Blur-Radius pro Zone (px)
         self._load_fonts()
         self._try_load_calibration()
 
@@ -203,6 +204,9 @@ class CardRenderer:
                 if "type" in xo: self._x_offsets["type"] = int(xo["type"])
                 logger.info("[Renderer] X-Offsets: Name=%s Type=%s",
                             self._x_offsets.get("name"), self._x_offsets.get("type"))
+            if "_blur_values" in data:
+                self._blur_values = {k: max(0, int(v)) for k, v in data["_blur_values"].items()}
+                logger.info("[Renderer] Blur-Werte: %s", self._blur_values)
             logger.info("[Renderer] Kalibrierung geladen: %s", self.calibration_file)
         except Exception as exc:
             logger.warning("[Renderer] Kalibrierung konnte nicht geladen werden: %s", exc)
@@ -615,7 +619,8 @@ class CardRenderer:
         return (int(zone[0]*w), int(zone[1]*h), int(zone[2]*w), int(zone[3]*h))
 
     def _erase_zone(self, img: Image.Image, x1, y1, x2, y2,
-                    watermark_bump: tuple | None = None) -> Image.Image:
+                    watermark_bump: tuple | None = None,
+                    blur_radius: int = 0) -> Image.Image:
         """
         Entfernt Text aus einer Zone und rekonstruiert den Hintergrund.
 
@@ -627,9 +632,13 @@ class CardRenderer:
 
         Erkennung: Wenn die Standardabweichung der Helligkeit in der Zone
         hoch ist (> 25), handelt es sich wahrscheinlich um Full-Art → Inpainting.
+
+        blur_radius > 0: Weicher Übergang an den Zonenrändern (Feathering).
         """
+        from PIL import ImageFilter as _IFilt
         import cv2 as _cv2
 
+        original = img  # für Blur-Blending merken
         arr = np.array(img.convert("RGB"))
         zone = arr[y1:y2, x1:x2]
 
@@ -649,6 +658,17 @@ class CardRenderer:
             mask = Image.new("L", (bx2-bx1, by2-by1), 0)
             ImageDraw.Draw(mask).ellipse([0, 0, bx2-bx1, by2-by1], fill=255)
             result.paste(orig_crop, (bx1, by1), mask=mask)
+
+        # Feathering: weicher Überblendbereich an den Zonenrändern
+        if blur_radius > 0:
+            # Maske: innen 255 (gelöschte Zone), Rand weich auslaufen
+            blend_mask = Image.new("L", original.size, 0)
+            ImageDraw.Draw(blend_mask).rectangle([x1, y1, x2, y2], fill=255)
+            blend_mask = blend_mask.filter(_IFilt.GaussianBlur(radius=blur_radius))
+            # composite: blend_mask=255 → result (gelöscht), blend_mask=0 → original
+            result = Image.composite(result.convert("RGBA"),
+                                     original.convert("RGBA"),
+                                     blend_mask).convert(img.mode)
 
         return result
 
@@ -737,7 +757,8 @@ class CardRenderer:
 
         for key in ["name", "type_line"]:
             if key in zones:
-                img = self._erase_zone(img, *self._abs(img, zones[key]))
+                img = self._erase_zone(img, *self._abs(img, zones[key]),
+                                       blur_radius=self._blur_values.get(key, 0))
 
         # Wassermarken-Bump aus Kalibrierung lesen
         bump_abs = None
@@ -751,7 +772,8 @@ class CardRenderer:
 
         if "oracle_box" in zones:
             img = self._erase_zone(img, *self._abs(img, zones["oracle_box"]),
-                                   watermark_bump=bump_abs)
+                                   watermark_bump=bump_abs,
+                                   blur_radius=self._blur_values.get("oracle_box", 0))
 
         # pt_box als Schutzbereich: Original-Pixel nach Oracle-Löschung zurückkleben,
         # damit der Oracle-Cleanup nicht in den P/T-Bereich hineinragt.
